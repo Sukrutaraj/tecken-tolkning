@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<title>Teckenspråk till tal</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<script src="app.js" defer></script>
+
+</head>
+
+<body>
+
+<h1>Teckenspråk till tal</h1>
+
+<!-- STATUS -->
+<div id="statusBox" class="status neutral">
+  <div class="status-icon">ℹ️</div>
+  <div>
+    <div id="statusMain">Redo</div>
+    <div id="statusSub">Verktyget är redo</div>
+  </div>
+</div>
+
+<div class="hint-box">
+  Du lär verktyget genom att visa tecken
+</div>
+
+<!-- VIDEO -->
+<div class="main-layout">
+  <div class="video-card">
+    <video class="input_video" autoplay playsinline></video>
+    <canvas class="output_canvas"></canvas>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUT -->
+<input type="file" id="datasetFile" multiple style="display:none">
+
+<!-- BUTTONS -->
+<div class="bottom-actions">
+
+  <button class="circle-btn" onclick="startRecording()">
+    🎤<br>Spela in
+  </button>
+
+  <button class="circle-btn" onclick="document.getElementById('datasetFile').click()">
+    📂<br>Ladda upp
+  </button>
+
+  <button class="circle-btn" onclick="trainModel()">
+    🧠<br>Lär verktyget
+  </button>
+
+  <button class="circle-btn" onclick="downloadData()">
+    💾<br>Ladda ner
+  </button>
+
+</div>
+
+</body>
+</html>
