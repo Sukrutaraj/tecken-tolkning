@@ -2,67 +2,1115 @@
 <html lang="sv">
 <head>
 <meta charset="UTF-8">
-<title>Teckenspråk till tal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teckenspråk till text</title>
 
-<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 
-<script src="app.js" defer></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
 
+body {
+  font-family: sans-serif;
+  background: #f5f5f5;
+  color: #222;
+  text-align: center;
+  padding: 16px;
+  max-width: 600px;
+  margin: 0 auto 40px;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 8px 0 16px;
+}
+
+/* ── STATUS ── */
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 0 auto 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  border-left: 5px solid #1976D2;
+  text-align: left;
+}
+.status .status-icon { font-size: 24px; line-height: 1; }
+#statusMain { font-weight: 700; font-size: 15px; }
+#statusSub  { font-size: 13px; color: #666; margin-top: 2px; }
+
+.status.neutral { border-left-color: #1976D2; }
+.status.ready   { border-left-color: #2e7d32; }
+.status.busy    { border-left-color: #f9a825; }
+.status.success { border-left-color: #2e7d32; }
+.status.error   { border-left-color: #c62828; }
+
+/* ── HINT ── */
+.hint-box {
+  background: #e8f1fc;
+  color: #1565c0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin: 0 auto 14px;
+}
+
+/* ── VIDEO ── */
+.main-layout { margin-bottom: 14px; }
+
+.video-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.video-card video,
+.video-card canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.video-card canvas { z-index: 2; }
+
+#pred-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 3;
+  padding: 14px 16px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+  min-height: 64px;
+}
+#pred-label {
+  font-size: clamp(18px, 5vw, 28px);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+#pred-pct {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+}
+#pred-live-tag {
+  position: absolute;
+  top: 12px; left: 12px; z-index: 3;
+  background: rgba(0,0,0,0.45);
+  color: #fff; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px; border-radius: 50px;
+}
+
+#countdown-overlay {
+  position: absolute; inset: 0; z-index: 4;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+}
+#countdown-overlay.active { display: flex; }
+#countdown-num {
+  font-size: 96px; font-weight: 700; color: #fff;
+  text-shadow: 0 0 30px rgba(0,0,0,0.6);
+}
+
+#rec-overlay {
+  position: absolute; top: 12px; right: 12px; z-index: 4;
+  display: none; align-items: center; gap: 6px;
+  background: #e53935; color: #fff;
+  border-radius: 50px; padding: 5px 12px;
+  font-size: 13px; font-weight: 700;
+}
+#rec-overlay.active { display: flex; }
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fff;
+  animation: blink 0.8s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+/* ── TEXT-RUTA (undertexter) ── */
+.subtitle-card {
+  background: #1b2733;
+  border-radius: 14px;
+  padding: 22px 18px 16px;
+  margin: 0 auto 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  font-family: "Atkinson Hyperlegible", sans-serif;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+#subtitle-history {
+  text-align: center;
+  color: #7e93a8;
+  font-size: 18px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+#subtitle-current {
+  text-align: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: clamp(34px, 11vw, 64px);
+  line-height: 1.1;
+  word-break: break-word;
+}
+#subtitle-current.placeholder { color: #50647a; font-weight: 400; font-size: 22px; }
+
+.subtitle-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto 14px;
+  flex-wrap: wrap;
+}
+.pill-btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #cfd8e2;
+  background: #fff;
+  color: #33444f;
+  border-radius: 50px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pill-btn:hover { background: #f1f5f9; }
+.pill-btn.on { background: #1976D2; border-color: #1976D2; color: #fff; }
+
+/* ── SECTIONS ── */
+.section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 0 auto 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  text-align: left;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #444;
+  margin-bottom: 10px;
+}
+
+label.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+}
+#gesture-name-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  outline: none;
+}
+#gesture-name-input:focus { border-color: #1976D2; }
+
+/* ── STATS ── */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat-box {
+  background: #f0f4f8;
+  border-radius: 10px;
+  padding: 10px 6px;
+  text-align: center;
+}
+.stat-num { font-size: 20px; font-weight: 700; color: #1976D2; }
+.stat-label { font-size: 11px; color: #777; margin-top: 2px; }
+
+/* ── LIBRARY ── */
+#gesture-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gesture-card {
+  position: relative;
+  background: #f0f4f8;
+  border: 1px solid #e2e8ef;
+  border-radius: 10px;
+  padding: 10px 30px 10px 12px;
+  min-width: 130px;
+  flex: 1 1 130px;
+}
+.gesture-card.enough { border-color: #2e7d32; background: #eef7ef; }
+.gesture-name { font-size: 15px; font-weight: 700; }
+.gesture-count { font-size: 12px; color: #777; margin-top: 2px; }
+.gesture-progress {
+  height: 4px; background: #dde3ea; border-radius: 2px;
+  margin-top: 6px; overflow: hidden;
+}
+.gesture-progress-fill {
+  height: 100%; background: #1976D2; border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.gesture-card.enough .gesture-progress-fill { background: #2e7d32; }
+.gesture-del {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  border: none; background: transparent;
+  color: #999; font-size: 15px; cursor: pointer;
+  border-radius: 5px;
+}
+.gesture-del:hover { color: #c62828; background: #fde8e8; }
+.empty-library {
+  width: 100%; text-align: center; color: #999;
+  font-size: 14px; padding: 14px;
+}
+
+/* ── TRAINING BAR ── */
+#train-bar-wrap { display: none; margin-top: 6px; }
+#train-bar-wrap.active { display: block; }
+.train-bar-bg {
+  height: 6px; background: #e2e8ef; border-radius: 3px; overflow: hidden;
+}
+.train-bar-fill {
+  height: 100%; width: 0%; border-radius: 3px;
+  background: linear-gradient(90deg, #1976D2, #00bfa5);
+  transition: width 0.3s ease;
+}
+.train-bar-label { font-size: 12px; color: #777; margin-top: 6px; }
+
+/* ── BOTTOM BUTTONS ── */
+.bottom-actions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 18px auto 10px;
+}
+.circle-btn {
+  width: 86px; height: 86px;
+  border-radius: 50%;
+  border: 2px solid #333;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #222;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: transform 0.1s, background 0.15s;
+}
+.circle-btn .ci { font-size: 26px; }
+.circle-btn:active { transform: scale(0.94); }
+.circle-btn:hover { background: #f3f3f3; }
+.circle-btn.primary { border-color: #1976D2; }
+.circle-btn.primary .ci { }
+</style>
 </head>
 
 <body>
 
-<h1>Teckenspråk till tal</h1>
+<h1>Teckenspråk till text</h1>
 
 <!-- STATUS -->
 <div id="statusBox" class="status neutral">
   <div class="status-icon">ℹ️</div>
   <div>
-    <div id="statusMain">Redo</div>
-    <div id="statusSub">Verktyget är redo</div>
+    <div id="statusMain">Laddar...</div>
+    <div id="statusSub">Startar kameran</div>
   </div>
 </div>
 
 <div class="hint-box">
-  Du lär verktyget genom att visa tecken
+  Visa ett tecken framför kameran – texten visas nedanför
 </div>
 
 <!-- VIDEO -->
 <div class="main-layout">
   <div class="video-card">
-    <video class="input_video" autoplay playsinline></video>
+    <video class="input_video" autoplay playsinline muted></video>
     <canvas class="output_canvas"></canvas>
+
+    <div id="pred-live-tag">LIVE</div>
+    <div id="pred-overlay">
+      <div id="pred-label">—</div>
+      <div id="pred-pct">0%</div>
+    </div>
+
+    <div id="countdown-overlay"><div id="countdown-num">3</div></div>
+    <div id="rec-overlay"><span class="rec-dot"></span> SPELAR IN</div>
   </div>
 </div>
 
-<!-- HIDDEN FILE INPUT -->
-<input type="file" id="datasetFile" multiple style="display:none">
+<!-- TEXT-RUTA (det tecknaren kan läsa och bekräfta) -->
+<div class="subtitle-card">
+  <div id="subtitle-history"></div>
+  <div id="subtitle-current" class="placeholder">Visa ett tecken …</div>
+</div>
+
+<div class="subtitle-controls">
+  <button class="pill-btn on" id="speech-toggle" onclick="toggleSpeech()">🔊 Röst: på</button>
+  <button class="pill-btn" onclick="clearSubtitles()">🗑 Rensa text</button>
+</div>
+
+<!-- NAME INPUT -->
+<div class="section">
+  <label class="field-label" for="gesture-name-input">Vilket tecken vill du lära in?</label>
+  <input type="text" id="gesture-name-input" placeholder="T.ex. Hej, Tack, Ja, Nej"
+         maxlength="30"
+         onkeydown="if(event.key==='Enter') startRecording()">
+</div>
+
+<!-- STATS + LIBRARY -->
+<div class="section">
+  <div class="section-title">Inlärda tecken</div>
+  <div class="stats">
+    <div class="stat-box"><div class="stat-num" id="stat-gestures">0</div><div class="stat-label">Tecken</div></div>
+    <div class="stat-box"><div class="stat-num" id="stat-samples">0</div><div class="stat-label">Inspelningar</div></div>
+    <div class="stat-box"><div class="stat-num" id="stat-ready">0</div><div class="stat-label">Klara</div></div>
+  </div>
+  <div id="train-bar-wrap">
+    <div class="train-bar-bg"><div class="train-bar-fill" id="train-bar-fill"></div></div>
+    <div class="train-bar-label" id="train-bar-label">Epoch 0 / 60</div>
+  </div>
+  <div id="gesture-grid" style="margin-top:12px;">
+    <div class="empty-library">Inga tecken inlärda ännu.<br>Skriv ett namn ovan och tryck på 🎤 Spela in.</div>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUT (the .json learning data) -->
+<input type="file" id="datasetFile" accept=".json,application/json" multiple
+       style="display:none" onchange="importData(event)">
 
 <!-- BUTTONS -->
 <div class="bottom-actions">
-
-  <button class="circle-btn" onclick="startRecording()">
-    🎤<br>Spela in
+  <button class="circle-btn primary" onclick="startRecording()">
+    <span class="ci">🎤</span>Spela in
   </button>
-
   <button class="circle-btn" onclick="document.getElementById('datasetFile').click()">
-    📂<br>Ladda upp
+    <span class="ci">📂</span>Ladda upp
   </button>
-
   <button class="circle-btn" onclick="trainModel()">
-    🧠<br>Lär verktyget
+    <span class="ci">🧠</span>Lär verktyget
   </button>
-
   <button class="circle-btn" onclick="downloadData()">
-    💾<br>Ladda ner
+    <span class="ci">💾</span>Ladda ner
   </button>
-
 </div>
 
+<script>
+/* ════════════════════════════════════════════
+   KONSTANTER
+════════════════════════════════════════════ */
+const SEQUENCE_LENGTH = 30;   // bilder per inspelning
+const FRAME_SIZE      = 63;   // 21 punkter × (x,y,z)
+const RECORD_TIME     = 3000; // ms inspelning
+const MIN_SAMPLES     = 2;    // min inspelningar per tecken före träning
+const HISTORY_SIZE    = 15;   // utjämningsfönster
+const SPEAK_THRESHOLD = 0.78; // säkerhet som krävs för att tala
+const SPEAK_COOLDOWN  = 3000; // ms mellan upprepad tal
+
+/* ════════════════════════════════════════════
+   MOLNLAGRING  —  ÄNDRA HÄR vid behov
+   Samma upplägg som dina andra verktyg: en Vercel-proxy
+   skriver filer till GitHub-repot, och alla läser dem
+   publikt via GitHub Pages.  Lägg helst teckensprak.html
+   i SAMMA repo som filerna nedan, så slipper du CORS.
+════════════════════════════════════════════ */
+const UPLOAD_API   = "https://upload-api-kappa.vercel.app/api/upload";
+const REPO         = "Sukrutaraj/checklist-pages";
+const PAGES_BASE   = "https://sukrutaraj.github.io/checklist-pages/";
+const DATA_PATH    = "teckensprak-data.json";          // delad inspelningsdata
+const MODEL_JSON   = "teckensprak-model.json";         // delad tränad modell
+const WEIGHTS_FILE = "teckensprak-model.weights.bin";  // modellens vikter
+
+/* ════════════════════════════════════════════
+   TILLSTÅND
+════════════════════════════════════════════ */
+let dataset          = loadDataset();
+let model            = null;
+let labels           = [];
+let predHistory      = [];
+let lastSpokenLabel  = '';
+let lastSpokenTime   = 0;
+let isRecording      = false;
+let recordBuffer     = [];
+let liveSequence     = [];
+let repoDataLoaded   = false;
+let speechOn         = true;   // röst på/av (text visas alltid)
+let subtitleHistory  = [];     // tidigare igenkända tecken
+
+/* ════════════════════════════════════════════
+   BASE64-HJÄLP (samma princip som dina andra verktyg)
+════════════════════════════════════════════ */
+function b64FromBytes(bytes) {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+function b64FromString(str)    { return b64FromBytes(new TextEncoder().encode(str)); }
+function b64FromBuffer(buffer) { return b64FromBytes(new Uint8Array(buffer)); }
+
+/* Skriv en fil till repot via proxyn */
+async function uploadFile(path, content) {
+  const res = await fetch(UPLOAD_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, content, repo: REPO })
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "Upload failed");
+  return data;
+}
+
+/* ════════════════════════════════════════════
+   LAGRING (localStorage)
+════════════════════════════════════════════ */
+function loadDataset() {
+  try {
+    const raw = localStorage.getItem("ts_dataset");
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function saveDataset() {
+  try { localStorage.setItem("ts_dataset", JSON.stringify(dataset)); }
+  catch (e) { setStatus("error", "Lagringen är full", "Ladda ner data och rensa för att fortsätta"); }
+}
+
+/* ════════════════════════════════════════════
+   STATUS
+════════════════════════════════════════════ */
+function setStatus(type, main, sub) {
+  const box  = document.getElementById("statusBox");
+  const icon = box.querySelector(".status-icon");
+  box.className = "status " + type;
+  document.getElementById("statusMain").textContent = main;
+  document.getElementById("statusSub").textContent  = sub || "";
+  const icons = { neutral:"ℹ️", ready:"✅", busy:"⏳", success:"✅", error:"⚠️" };
+  icon.textContent = icons[type] || "ℹ️";
+}
+
+/* ════════════════════════════════════════════
+   BIBLIOTEK
+════════════════════════════════════════════ */
+function renderLibrary() {
+  const grid = document.getElementById("gesture-grid");
+
+  if (dataset.length === 0) {
+    grid.innerHTML = '<div class="empty-library">Inga tecken inlärda ännu.<br>Skriv ett namn ovan och tryck på 🎤 Spela in.</div>';
+    updateStats();
+    return;
+  }
+
+  grid.innerHTML = "";
+  dataset.forEach((entry, i) => {
+    const count  = entry.samples.length;
+    const pct    = Math.min(100, Math.round((count / MIN_SAMPLES) * 100));
+    const enough = count >= MIN_SAMPLES;
+
+    const card = document.createElement("div");
+    card.className = "gesture-card" + (enough ? " enough" : "");
+    card.innerHTML =
+      '<button class="gesture-del" title="Ta bort" onclick="deleteGesture(' + i + ')">✕</button>' +
+      '<div class="gesture-name"></div>' +
+      '<div class="gesture-count">' + count + ' / ' + MIN_SAMPLES + ' inspelningar</div>' +
+      '<div class="gesture-progress"><div class="gesture-progress-fill" style="width:' + pct + '%"></div></div>';
+    card.querySelector(".gesture-name").textContent = entry.label;
+    grid.appendChild(card);
+  });
+
+  updateStats();
+}
+
+function updateStats() {
+  const total = dataset.reduce((s, e) => s + e.samples.length, 0);
+  const ready = dataset.filter(e => e.samples.length >= MIN_SAMPLES).length;
+  document.getElementById("stat-gestures").textContent = dataset.length;
+  document.getElementById("stat-samples").textContent  = total;
+  document.getElementById("stat-ready").textContent    = ready;
+}
+
+function deleteGesture(i) {
+  if (!confirm('Ta bort tecknet "' + dataset[i].label + '" och alla dess inspelningar?')) return;
+  dataset.splice(i, 1);
+  saveDataset();
+  renderLibrary();
+  model = null;
+  setStatus("ready", "Redo", "Lär verktyget igen efter ändring");
+}
+
+/* ════════════════════════════════════════════
+   INSPELNING
+════════════════════════════════════════════ */
+function startRecording() {
+  const nameRaw = document.getElementById("gesture-name-input").value.trim();
+  if (!nameRaw) {
+    setStatus("error", "Skriv ett namn först", 'Skriv vilket tecken du vill lära in, t.ex. "Hej"');
+    document.getElementById("gesture-name-input").focus();
+    return;
+  }
+  if (isRecording) return;
+
+  const name = nameRaw.charAt(0).toUpperCase() + nameRaw.slice(1);
+
+  let count = 3;
+  const countEl   = document.getElementById("countdown-num");
+  const cdOverlay = document.getElementById("countdown-overlay");
+
+  countEl.textContent = count;
+  cdOverlay.classList.add("active");
+  setStatus("busy", "Gör dig redo", count + "...");
+
+  const interval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      countEl.textContent = count;
+      setStatus("busy", "Gör dig redo", count + "...");
+    } else {
+      clearInterval(interval);
+      cdOverlay.classList.remove("active");
+
+      recordBuffer = [];
+      isRecording  = true;
+      document.getElementById("rec-overlay").classList.add("active");
+      setStatus("busy", "Spelar in", "Visa tecknet: " + name);
+
+      setTimeout(() => {
+        isRecording = false;
+        document.getElementById("rec-overlay").classList.remove("active");
+
+        if (recordBuffer.length < 5) {
+          setStatus("error", "För lite data", "Syns handen tydligt i kameran?");
+          return;
+        }
+
+        const sample = normalizeSequence(recordBuffer, SEQUENCE_LENGTH);
+
+        let entry = dataset.find(e => e.label === name);
+        if (!entry) { entry = { label: name, samples: [] }; dataset.push(entry); }
+        entry.samples.push(sample);
+        saveDataset();
+        renderLibrary();
+
+        const total  = entry.samples.length;
+        const needed = Math.max(0, MIN_SAMPLES - total);
+        setStatus("success",
+          '"' + name + '" sparad (' + total + ' st)',
+          needed > 0 ? "Spela in " + needed + " till för träning" : "Redo att lära in!"
+        );
+        model = null;
+      }, RECORD_TIME);
+    }
+  }, 1000);
+}
+
+/* Justera en sekvens till exakt targetLen bilder */
+function normalizeSequence(seq, targetLen) {
+  if (seq.length === targetLen) return seq.map(f => f.slice());
+  const result = [];
+  for (let i = 0; i < targetLen; i++) {
+    const srcIdx = Math.round((i / (targetLen - 1)) * (seq.length - 1));
+    result.push(seq[Math.min(srcIdx, seq.length - 1)].slice());
+  }
+  return result;
+}
+
+/* ════════════════════════════════════════════
+   TRÄNING (LSTM)
+════════════════════════════════════════════ */
+async function trainModel() {
+  // Hämta först den delade datan så att vi tränar på allt och inte skriver över andras tecken
+  if (!repoDataLoaded) {
+    setStatus("busy", "Hämtar delad data...", "så att inget skrivs över");
+    try { await loadDatasetFromRepo(); } catch (e) { repoDataLoaded = true; /* tomt repo / offline */ }
+  }
+
+  const ready = dataset.filter(e => e.samples.length >= MIN_SAMPLES);
+
+  if (ready.length < 2) {
+    setStatus("error", "Behöver fler tecken",
+      "Minst 2 tecken med " + MIN_SAMPLES + "+ inspelningar vardera");
+    return;
+  }
+
+  setStatus("busy", "Lär in...", "Detta kan ta en stund");
+  document.getElementById("train-bar-wrap").classList.add("active");
+
+  labels = ready.map(e => e.label);
+
+  const xs = [], ys = [];
+  ready.forEach((entry, labelIdx) => {
+    entry.samples.forEach(sample => { xs.push(sample); ys.push(labelIdx); });
+  });
+
+  // Blanda
+  const indices = Array.from({ length: xs.length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const xsShuf = indices.map(i => xs[i]);
+  const ysShuf = indices.map(i => ys[i]);
+
+  const splitAt = Math.max(1, Math.floor(xsShuf.length * 0.8));
+  const xTrain  = xsShuf.slice(0, splitAt);
+  const yTrain  = ysShuf.slice(0, splitAt);
+  const xVal    = xsShuf.slice(splitAt);
+  const yVal    = ysShuf.slice(splitAt);
+
+  const EPOCHS = 60;
+
+  const xTrainT = tf.tensor3d(xTrain);
+  const yTrainT = tf.oneHot(tf.tensor1d(yTrain, "int32"), labels.length);
+  const xValT   = xVal.length ? tf.tensor3d(xVal) : null;
+  const yValT   = yVal.length ? tf.oneHot(tf.tensor1d(yVal, "int32"), labels.length) : null;
+
+  model = tf.sequential();
+  model.add(tf.layers.lstm({
+    units: 64,
+    inputShape: [SEQUENCE_LENGTH, FRAME_SIZE],
+    returnSequences: false,
+    recurrentDropout: 0.1
+  }));
+  model.add(tf.layers.dense({ units: 64, activation: "relu" }));
+  model.add(tf.layers.dropout({ rate: 0.3 }));
+  model.add(tf.layers.dense({ units: labels.length, activation: "softmax" }));
+
+  model.compile({
+    optimizer: tf.train.adam(0.001),
+    loss: "categoricalCrossentropy",
+    metrics: ["accuracy"]
+  });
+
+  const barFill  = document.getElementById("train-bar-fill");
+  const barLabel = document.getElementById("train-bar-label");
+  let lastAcc = 0;
+
+  await model.fit(xTrainT, yTrainT, {
+    epochs: EPOCHS,
+    batchSize: 16,
+    shuffle: true,
+    validationData: xValT ? [xValT, yValT] : undefined,
+    callbacks: {
+      onEpochEnd: (epoch, logs) => {
+        const pct = Math.round(((epoch + 1) / EPOCHS) * 100);
+        barFill.style.width = pct + "%";
+        const acc = Math.round(((logs.val_acc ?? logs.acc) || 0) * 100);
+        lastAcc = acc;
+        barLabel.textContent = "Epoch " + (epoch + 1) + " / " + EPOCHS + "  ·  Träffsäkerhet " + acc + "%";
+      }
+    }
+  });
+
+  xTrainT.dispose(); yTrainT.dispose();
+  if (xValT) { xValT.dispose(); yValT.dispose(); }
+
+  document.getElementById("train-bar-wrap").classList.remove("active");
+
+  // Lokal säkerhetskopia (fungerar även offline)
+  try {
+    await model.save("indexeddb://teckensprak-model");
+    localStorage.setItem("ts_labels", JSON.stringify(labels));
+  } catch (e) { /* lagring ej tillgänglig */ }
+
+  // Publicera till repot så att ALLA enheter får den uppdaterade modellen
+  setStatus("busy", "Sparar för alla...", "laddar upp modell och data");
+  try {
+    await saveModelToRepo();
+    await saveDatasetToRepo();
+    setStatus("success", "Klar och delad! (" + lastAcc + "%)",
+      "Alla som öppnar länken får detta");
+  } catch (e) {
+    setStatus("error", "Tränad – men inte delad",
+      "Kunde inte spara till servern. Sparad lokalt på den här enheten.");
+  }
+}
+
+/* ════════════════════════════════════════════
+   GISSNING + TAL
+════════════════════════════════════════════ */
+function predict() {
+  if (!model || liveSequence.length < SEQUENCE_LENGTH) return;
+
+  const input = tf.tensor3d([liveSequence.slice(-SEQUENCE_LENGTH)]);
+  const pred  = model.predict(input);
+
+  pred.array().then(scores => {
+    const s          = scores[0];
+    const maxIdx     = s.indexOf(Math.max(...s));
+    const confidence = s[maxIdx];
+    const pct        = Math.round(confidence * 100);
+    const label      = labels[maxIdx];
+
+    predHistory.push(label);
+    if (predHistory.length > HISTORY_SIZE) predHistory.shift();
+
+    const counts = {};
+    predHistory.forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    const stableLabel = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+
+    document.getElementById("pred-label").textContent = stableLabel;
+    document.getElementById("pred-pct").textContent   = pct + "%";
+
+    if (
+      pct >= Math.round(SPEAK_THRESHOLD * 100) &&
+      stableLabel === label &&
+      (stableLabel !== lastSpokenLabel || Date.now() - lastSpokenTime > SPEAK_COOLDOWN)
+    ) {
+      showSubtitle(stableLabel);          // text – det tecknaren kan bekräfta
+      if (speechOn) speak(stableLabel);   // röst – för hörande i rummet
+      lastSpokenLabel = stableLabel;
+      lastSpokenTime  = Date.now();
+    }
+  });
+
+  input.dispose();
+  pred.dispose();
+}
+
+/* ── TEXT-UTMATNING ── */
+function showSubtitle(text) {
+  const current = document.getElementById("subtitle-current");
+  const history = document.getElementById("subtitle-history");
+
+  // Flytta nuvarande ord upp i historiken
+  if (!current.classList.contains("placeholder") && current.textContent) {
+    subtitleHistory.push(current.textContent);
+    if (subtitleHistory.length > 6) subtitleHistory.shift();
+    history.textContent = subtitleHistory.join("  ·  ");
+  }
+
+  current.classList.remove("placeholder");
+  current.textContent = text;
+}
+
+function clearSubtitles() {
+  subtitleHistory = [];
+  document.getElementById("subtitle-history").textContent = "";
+  const current = document.getElementById("subtitle-current");
+  current.classList.add("placeholder");
+  current.textContent = "Visa ett tecken …";
+  lastSpokenLabel = "";
+}
+
+function toggleSpeech() {
+  speechOn = !speechOn;
+  const btn = document.getElementById("speech-toggle");
+  btn.textContent = speechOn ? "🔊 Röst: på" : "🔇 Röst: av";
+  btn.classList.toggle("on", speechOn);
+  if (!speechOn) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+
+function speak(text) {
+  try {
+    speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = "sv-SE";
+    msg.rate = 0.9;
+    speechSynthesis.speak(msg);
+  } catch (e) {}
+}
+
+/* ════════════════════════════════════════════
+   LADDA NER (export) + LADDA UPP (import)
+════════════════════════════════════════════ */
+function downloadData() {
+  if (dataset.length === 0) { setStatus("error", "Inget att ladda ner", "Spela in minst ett tecken först"); return; }
+  // Spara i samma format som verktyget läser in:
+  // en post per inspelning, { label, sequence: [ ...bilder ] }
+  const out = [];
+  dataset.forEach(entry => {
+    entry.samples.forEach(seq => out.push({ label: entry.label, sequence: seq }));
+  });
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "teckensprak_data_" + Date.now() + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus("success", "Nedladdad!", "Filen är sparad på din enhet");
+}
+
+function isValidFrame(f) {
+  return Array.isArray(f) && f.length === FRAME_SIZE && f.every(n => typeof n === "number" && isFinite(n));
+}
+
+/* Gör en inkommande inspelning giltig: sekvens av bilder, var och en 63 tal,
+   exakt SEQUENCE_LENGTH lång. Returnerar null om den inte går att tolka. */
+function cleanSample(sample) {
+  if (!Array.isArray(sample) || sample.length === 0) return null;
+
+  // En enda bild (platt lista med 63 tal) -> upprepa till en sekvens
+  if (typeof sample[0] === "number") {
+    if (!isValidFrame(sample)) return null;
+    const seq = [];
+    for (let i = 0; i < SEQUENCE_LENGTH; i++) seq.push(sample.slice());
+    return seq;
+  }
+
+  // En sekvens av bilder
+  if (Array.isArray(sample[0])) {
+    if (!sample.every(isValidFrame)) return null;
+    return normalizeSequence(sample, SEQUENCE_LENGTH);
+  }
+
+  return null;
+}
+
+function importData(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  let filesDone = 0;
+  let addedSamples = 0;
+
+  files.forEach(file => {
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const incoming = JSON.parse(r.result);
+        addedSamples += mergeIncoming(incoming).added;
+      } catch (err) {
+        setStatus("error", "Kunde inte läsa filen", file.name + " är inte en giltig .json-fil");
+      }
+
+      filesDone++;
+      if (filesDone === files.length) {
+        saveDataset();
+        renderLibrary();
+        model = null;
+        if (addedSamples > 0) {
+          setStatus("success",
+            "Uppladdad! (" + addedSamples + " inspelningar)",
+            dataset.length + " tecken totalt — tryck 🧠 Lär verktyget");
+        } else {
+          setStatus("error", "Inget nytt lades till", "Filformatet kändes inte igen eller fanns redan");
+        }
+      }
+    };
+    r.readAsText(file);
+  });
+
+  e.target.value = "";
+}
+
+/* Signatur för en inspelning – används för att hoppa över dubbletter */
+function sampleSig(label, seq) {
+  const f0 = seq[0] || [], fm = seq[Math.floor(seq.length / 2)] || [];
+  const part = a => a.slice(0, 6).map(n => n.toFixed(3)).join(",");
+  return label + "|" + part(f0) + "|" + part(fm);
+}
+
+/* Slå ihop inkommande data (fil eller moln) med datasetet.
+   Hanterar { label, sequence } och { label, samples }, samt objekt-format.
+   Returnerar { added, skipped }. */
+function mergeIncoming(incoming) {
+  if (incoming && !Array.isArray(incoming) && typeof incoming === "object") {
+    incoming = Object.keys(incoming).map(k => ({ label: k, samples: incoming[k] }));
+  }
+  if (!Array.isArray(incoming)) return { added: 0, skipped: 0 };
+
+  const seen = new Set();
+  dataset.forEach(e => e.samples.forEach(s => seen.add(sampleSig(e.label, s))));
+
+  let added = 0, skipped = 0;
+  incoming.forEach(entry => {
+    if (!entry || typeof entry.label !== "string") { skipped++; return; }
+
+    let raw = null;
+    if (Array.isArray(entry.sequence))     raw = [entry.sequence];
+    else if (Array.isArray(entry.samples)) raw = entry.samples;
+    else { skipped++; return; }
+
+    raw.forEach(s => {
+      const cs = cleanSample(s);
+      if (!cs) { skipped++; return; }
+      const sig = sampleSig(entry.label, cs);
+      if (seen.has(sig)) return;        // dubblett – hoppa över
+      seen.add(sig);
+      const ex = dataset.find(d => d.label === entry.label);
+      if (ex) ex.samples.push(cs);
+      else dataset.push({ label: entry.label, samples: [cs] });
+      added++;
+    });
+  });
+  return { added, skipped };
+}
+
+/* ════════════════════════════════════════════
+   MOLN: läsa/skriva delad data och modell
+════════════════════════════════════════════ */
+async function fetchJson(file) {
+  const res = await fetch(PAGES_BASE + file + "?cb=" + Date.now(), { cache: "no-store" });
+  if (!res.ok) throw new Error("not found");
+  return res.json();
+}
+
+/* Hämta den delade inspelningsdatan från repot in i datasetet */
+async function loadDatasetFromRepo() {
+  const incoming = await fetchJson(DATA_PATH);
+  const r = mergeIncoming(incoming);
+  repoDataLoaded = true;
+  saveDataset();
+  renderLibrary();
+  return r;
+}
+
+/* Spara hela datasetet till repot i { label, sequence }-format */
+async function saveDatasetToRepo() {
+  const out = [];
+  dataset.forEach(e => e.samples.forEach(seq => out.push({ label: e.label, sequence: seq })));
+  await uploadFile(DATA_PATH, b64FromString(JSON.stringify(out)));
+}
+
+/* Ladda den delade tränade modellen från repot (sätter model + labels) */
+async function loadModelFromRepo() {
+  const cb = "?cb=" + Date.now();
+  const mj = await (await fetch(PAGES_BASE + MODEL_JSON + cb, { cache: "no-store" })).json();
+  const wb = await (await fetch(PAGES_BASE + WEIGHTS_FILE + cb, { cache: "no-store" })).arrayBuffer();
+  const handler = tf.io.fromMemory({
+    modelTopology: mj.modelTopology,
+    weightSpecs:   mj.weightsManifest[0].weights,
+    weightData:    wb
+  });
+  const loaded = await tf.loadLayersModel(handler);
+  labels = Array.isArray(mj.tsLabels) ? mj.tsLabels : [];
+  model  = loaded;
+  return loaded;
+}
+
+/* Spara den tränade modellen till repot (model.json + vikt-fil) */
+async function saveModelToRepo() {
+  let artifacts = null;
+  await model.save(tf.io.withSaveHandler(async a => {
+    artifacts = a;
+    return { modelArtifactsInfo: { dateSaved: new Date(), modelTopologyType: "JSON" } };
+  }));
+  const modelJsonObj = {
+    modelTopology: artifacts.modelTopology,
+    format: "layers-model",
+    generatedBy: "teckensprak",
+    convertedBy: null,
+    weightsManifest: [{ paths: [WEIGHTS_FILE], weights: artifacts.weightSpecs }],
+    tsLabels: labels                      // tecknen sparas i samma fil
+  };
+  await uploadFile(MODEL_JSON,   b64FromString(JSON.stringify(modelJsonObj)));
+  await uploadFile(WEIGHTS_FILE, b64FromBuffer(artifacts.weightData));
+}
+
+/* ════════════════════════════════════════════
+   MEDIAPIPE / KAMERA
+════════════════════════════════════════════ */
+window.addEventListener("DOMContentLoaded", async () => {
+  const video  = document.querySelector(".input_video");
+  const canvas = document.querySelector(".output_canvas");
+  const ctx    = canvas.getContext("2d");
+
+  // Ladda den DELADE modellen från repot så verktyget känner igen tecken direkt.
+  // Faller tillbaka till lokal kopia om servern inte svarar.
+  try {
+    await loadModelFromRepo();
+  } catch (e) {
+    try {
+      const savedLabels = JSON.parse(localStorage.getItem("ts_labels") || "null");
+      if (savedLabels && savedLabels.length) {
+        model  = await tf.loadLayersModel("indexeddb://teckensprak-model");
+        labels = savedLabels;
+      }
+    } catch (e2) { model = null; }
+  }
+
+  function resizeCanvas() {
+    const card = canvas.closest(".video-card");
+    canvas.width  = card.offsetWidth;
+    canvas.height = card.offsetHeight;
+  }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  function onResults(results) {
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      const landmarks = results.multiHandLandmarks[0];
+
+      if (typeof drawConnectors === "function") {
+        drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: "rgba(0,191,165,0.8)", lineWidth: 2 });
+        drawLandmarks(ctx, landmarks, { color: "#fff", fillColor: "#1976D2", radius: 4, lineWidth: 1 });
+      }
+
+      const frame = [];
+      landmarks.forEach(p => frame.push(p.x, p.y, p.z));
+
+      if (isRecording) recordBuffer.push(frame);
+
+      liveSequence.push(frame);
+      if (liveSequence.length > SEQUENCE_LENGTH * 2) liveSequence.shift();
+
+      predict();
+    } else {
+      liveSequence = [];
+      if (model) document.getElementById("pred-label").textContent = "—";
+    }
+
+    ctx.restore();
+  }
+
+  const hands = new Hands({
+    locateFile: file => "https://cdn.jsdelivr.net/npm/@mediapipe/hands/" + file
+  });
+  hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7,
+    minTrackingConfidence: 0.7
+  });
+  hands.onResults(onResults);
+
+  const camera = new Camera(video, {
+    onFrame: async () => { await hands.send({ image: video }); },
+    width: 640, height: 480
+  });
+
+  camera.start()
+    .then(() => {
+      if (model && labels.length) {
+        setStatus("ready", "Redo", "Känner igen " + labels.length + " tecken — visa ett tecken");
+      } else {
+        setStatus("ready", "Redo", "Kameran är igång");
+      }
+    })
+    .catch(() => setStatus("error", "Kameran kunde inte starta", "Tillåt kameraåtkomst i webbläsaren"));
+
+  renderLibrary();
+});
+</script>
 </body>
 </html>
