@@ -1119,6 +1119,11 @@ window.addEventListener("DOMContentLoaded", async () => {
     .catch(() => setStatus("error", "Kameran kunde inte starta", "Tillåt kameraåtkomst i webbläsaren"));
 
   renderLibrary();
+
+  // Hämta den delade inspelningsdatan från repot så att teckenbiblioteket
+  // visas på ALLA enheter och webbläsare (inte bara den där man tränade).
+  // Körs i bakgrunden så kameran och igenkänningen inte fördröjs.
+  loadDatasetFromRepo().catch(() => { /* tomt repo / offline – strunt i det */ });
 });
 </script>
 </body>
